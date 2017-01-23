@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Medidata.ZipkinTracer.Models;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -28,10 +29,10 @@ namespace Medidata.ZipkinTracer.Core
             this.servicePort = (ushort)domain.Port;
         }
 
-        public virtual Span ReceiveServerSpan(string spanName, string traceId, string parentSpanId, string spanId, Uri requestUri)
+        public virtual async Task<Span> ReceiveServerSpan(string spanName, string traceId, string parentSpanId, string spanId, Uri requestUri)
         {
             var newSpan = CreateNewSpan(spanName, traceId, parentSpanId, spanId);
-            var serviceEndpoint = zipkinEndpoint.GetLocalEndpoint(serviceName, (ushort)requestUri.Port);
+            var serviceEndpoint = await zipkinEndpoint.GetLocalEndpoint(serviceName, (ushort)requestUri.Port);
 
             var annotation = new Annotation()
             {
@@ -69,10 +70,10 @@ namespace Medidata.ZipkinTracer.Core
             spanCollector.Collect(span);
         }
 
-        public virtual Span SendClientSpan(string spanName, string traceId, string parentSpanId, string spanId, Uri remoteUri)
+        public virtual async Task<Span> SendClientSpan(string spanName, string traceId, string parentSpanId, string spanId, Uri remoteUri)
         {
             var newSpan = CreateNewSpan(spanName, traceId, parentSpanId, spanId);
-            var serviceEndpoint = zipkinEndpoint.GetLocalEndpoint(serviceName, (ushort)remoteUri.Port);
+            var serviceEndpoint = await zipkinEndpoint.GetLocalEndpoint(serviceName, (ushort)remoteUri.Port);
             var clientServiceName = CleanServiceName(remoteUri.Host);
 
             var annotation = new Annotation
@@ -83,7 +84,7 @@ namespace Medidata.ZipkinTracer.Core
 
             newSpan.Annotations.Add(annotation);
             AddBinaryAnnotation("http.path", remoteUri.AbsolutePath, newSpan, serviceEndpoint);
-            AddBinaryAnnotation("sa", "1", newSpan, zipkinEndpoint.GetRemoteEndpoint(remoteUri, clientServiceName));
+            AddBinaryAnnotation("sa", "1", newSpan, await zipkinEndpoint.GetRemoteEndpoint(remoteUri, clientServiceName));
 
             return newSpan;
         }
@@ -125,26 +126,27 @@ namespace Medidata.ZipkinTracer.Core
             spanCollector.Collect(span);
         }
 
-        public virtual void Record(Span span, string value)
+        public virtual async Task Record(Span span, string value)
         {
             if (span == null)
                 throw new ArgumentNullException(nameof(span), "In order to record an annotation, the span must be not null.");
 
             span.Annotations.Add(new Annotation()
             {
-                Host = zipkinEndpoint.GetLocalEndpoint(serviceName, servicePort),
+                Host = await zipkinEndpoint.GetLocalEndpoint(serviceName, servicePort),
                 Value = value
             });
         }
 
-        public void RecordBinary<T>(Span span, string key, T value)
+        public async Task RecordBinary<T>(Span span, string key, T value)
         {
-             if (span == null)
+            if (span == null)
                 throw new ArgumentNullException(nameof(span), "In order to record a binary annotation, the span must be not null.");
 
+            var host = await zipkinEndpoint.GetLocalEndpoint(serviceName, servicePort);
             span.Annotations.Add(new BinaryAnnotation()
             {
-                Host = zipkinEndpoint.GetLocalEndpoint(serviceName, servicePort),
+                Host = host,
                 Key = key,
                 Value = value
             });

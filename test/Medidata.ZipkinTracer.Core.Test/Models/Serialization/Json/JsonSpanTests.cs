@@ -1,6 +1,6 @@
 ﻿using Medidata.ZipkinTracer.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Ploeh.AutoFixture;
+using NSubstitute;
 using System.Linq;
 
 namespace Medidata.ZipkinTracer.Core.Test.Models.Serialization.Json
@@ -8,12 +8,10 @@ namespace Medidata.ZipkinTracer.Core.Test.Models.Serialization.Json
     [TestClass]
     public class JsonSpanTests
     {
-        private IFixture fixture;
 
         [TestInitialize]
         public void Init()
         {
-            fixture = new Fixture();
         }
 
         [TestMethod]
@@ -22,15 +20,19 @@ namespace Medidata.ZipkinTracer.Core.Test.Models.Serialization.Json
             // Arrange
             var span = new Span
             {
-                Id = fixture.Create<string>(),
-                Name = fixture.Create<string>(),
-                ParentId = fixture.Create<string>(),
-                TraceId = fixture.Create<string>(),
+                Id = "15",
+                Name = "cnk",
+                ParentId = "05",
+                TraceId = "123",
             };
-            span.Annotations.Add(fixture.Create<Annotation>());
-            span.Annotations.Add(fixture.Create<Annotation>());
-            span.Annotations.Add(fixture.Create<BinaryAnnotation>());
-            span.Annotations.Add(fixture.Create<BinaryAnnotation>());
+
+            var annotation = Substitute.For<Annotation>();
+            var binaryAnnotation = Substitute.For<BinaryAnnotation>();
+
+            span.Annotations.Add(annotation);
+            span.Annotations.Add(annotation);
+            span.Annotations.Add(binaryAnnotation);
+            span.Annotations.Add(binaryAnnotation);
 
             // Act
             var result = new JsonSpan(span);

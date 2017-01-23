@@ -2,8 +2,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using Medidata.ZipkinTracer.Core.Logging;
 using Medidata.ZipkinTracer.Core.Helpers;
+using Microsoft.Extensions.Logging;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -11,30 +11,29 @@ namespace Medidata.ZipkinTracer.Core
     {
         private Task spanProcessorTaskInstance;
         private CancellationTokenSource cancellationTokenSource;
-        private ILog logger;
+        private ILogger<SpanProcessorTaskFactory> _logger;
         private const int defaultDelayTime = 500;
         private const int encounteredAnErrorDelayTime = 30000;
 
         readonly object sync = new object();
 
-        public SpanProcessorTaskFactory(ILog logger, CancellationTokenSource cancellationTokenSource)
+        public SpanProcessorTaskFactory(ILogger<SpanProcessorTaskFactory> logger, CancellationTokenSource cancellationTokenSource)
         {
-            this.logger = logger ?? LogProvider.GetCurrentClassLogger();
+            _logger = logger ?? new LoggerFactory().CreateLogger<SpanProcessorTaskFactory>(); 
             this.cancellationTokenSource = cancellationTokenSource ?? new CancellationTokenSource();
         }
 
         public SpanProcessorTaskFactory()
-            :this(LogProvider.GetCurrentClassLogger(), new CancellationTokenSource())
+            :this(new LoggerFactory().CreateLogger<SpanProcessorTaskFactory>() , new CancellationTokenSource())
         {
         }
 
-        [ExcludeFromCodeCoverage]  //excluded from code coverage since this class is a 1 liner that starts up a background thread
-        public virtual void CreateAndStart(Action action)
+        public virtual void CreateAndStart(Func<Task> taskFunc)
         {
             SyncHelper.ExecuteSafely(sync, () => spanProcessorTaskInstance == null || spanProcessorTaskInstance.Status == TaskStatus.Faulted,
                 () =>
                 {
-                    spanProcessorTaskInstance = Task.Factory.StartNew(() => ActionWrapper(action), cancellationTokenSource.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                    spanProcessorTaskInstance = Task.Factory.StartNew(() => TaskWrapper(taskFunc), cancellationTokenSource.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 });
         }
 
@@ -43,18 +42,18 @@ namespace Medidata.ZipkinTracer.Core
             SyncHelper.ExecuteSafely(sync, () => cancellationTokenSource.Token.CanBeCanceled, () => cancellationTokenSource.Cancel());
         }
 
-        internal async void ActionWrapper(Action action)
+        internal async Task TaskWrapper(Func<Task> taskFunc)
         {
             while (!IsTaskCancelled())
             {
                 int delayTime = defaultDelayTime;
                 try
                 {
-                    action();
+                    await taskFunc();
                 }
                 catch (Exception ex)
                 {
-                    logger.ErrorException("Error in SpanProcessorTask", ex);
+                    _logger.LogError(new EventId(0), ex, "Error in SpanProcessorTask");
                     delayTime = encounteredAnErrorDelayTime;
                 }
 

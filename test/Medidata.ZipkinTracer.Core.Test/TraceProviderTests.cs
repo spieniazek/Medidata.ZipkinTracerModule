@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Owin;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Ploeh.AutoFixture;
-using Rhino.Mocks;
+using NSubstitute;
+using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace Medidata.ZipkinTracer.Core.Test
@@ -56,13 +55,13 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_HavingTraceProviderInContext()
         {
             // Arrange
-            var context = MockRepository.GenerateStub<IOwinContext>();
-            var providerInContext = MockRepository.GenerateStub<ITraceProvider>();
-            var environment = new Dictionary<string, object>
+            var context = Substitute.ForPartsOf<HttpContext>();
+            var providerInContext = Substitute.For<ITraceProvider>();
+            var environment = new Dictionary<object, object>
             {
                 { "Medidata.ZipkinTracer.Core.TraceProvider", providerInContext }
             };
-            context.Stub(x => x.Environment).Return(environment);
+            context.Items.Returns(environment);
 
             // Act
             var sut = new TraceProvider(new ZipkinConfig(), context);
@@ -78,11 +77,10 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_AcceptingHeadersWith64BitTraceId()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = Convert.ToString(fixture.Create<long>(), 16);
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
-            var parentSpanId = Convert.ToString(fixture.Create<long>(), 16);
-            var isSampled = fixture.Create<bool>();
+            var traceId = Convert.ToString((long)123123123, 16);
+            var spanId = Convert.ToString((long)123132123, 16);
+            var parentSpanId = Convert.ToString((long)123123, 16);
+            var isSampled = false;
 
             var context = GenerateContext(
                 traceId,
@@ -104,11 +102,10 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_AcceptingHeadersWithLessThan16HexCharacters()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = Convert.ToString(fixture.Create<long>(), 16).Substring(1);
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
-            var parentSpanId = Convert.ToString(fixture.Create<long>(), 16);
-            var isSampled = fixture.Create<bool>();
+            var traceId = Convert.ToString((long)12231, 16).Substring(1);
+            var spanId = Convert.ToString((long)123212, 16);
+            var parentSpanId = Convert.ToString((long)123213213, 16);
+            var isSampled = false;
 
             var context = GenerateContext(
                 traceId,
@@ -130,11 +127,10 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_AcceptingHeadersWith128BitTraceId()
         {
             // Arrange
-            var fixture = new Fixture();
             var traceId = Guid.NewGuid().ToString("N");
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
-            var parentSpanId = Convert.ToString(fixture.Create<long>(), 16);
-            var isSampled = fixture.Create<bool>();
+            var spanId = Convert.ToString((long)231231, 16);
+            var parentSpanId = Convert.ToString((long)123123, 16);
+            var isSampled = false;
 
             var context = GenerateContext(
                 traceId,
@@ -156,28 +152,28 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_AcceptingHeadersWithOutIsSampled()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = Convert.ToString(fixture.Create<long>(), 16);
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
-            var parentSpanId = Convert.ToString(fixture.Create<long>(), 16);
+            var traceId = Convert.ToString((long)12123, 16);
+            var spanId = Convert.ToString((long)12213, 16);
+            var parentSpanId = Convert.ToString((long)213213213, 16);
 
-            var context = MockRepository.GenerateStub<IOwinContext>();
-            var request = MockRepository.GenerateStub<IOwinRequest>();
-            var headers = new HeaderDictionary(new Dictionary<string, string[]>
+            var context = Substitute.ForPartsOf<HttpContext>();
+            var request = Substitute.ForPartsOf<HttpRequest>();
+            var headers = new HeaderDictionary(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
             {
                 { TraceProvider.TraceIdHeaderName, new [] { traceId } },
                 { TraceProvider.SpanIdHeaderName, new [] { spanId } },
                 { TraceProvider.ParentSpanIdHeaderName, new [] { parentSpanId } }
             });
-            var environment = new Dictionary<string, object>();
+            var environment = new Dictionary<object, object>();
 
-            request.Stub(x => x.Headers).Return(headers);
-            context.Stub(x => x.Request).Return(request);
-            context.Stub(x => x.Environment).Return(environment);
+            request.Headers.Returns(headers);
+            context.Request.Returns(request);
+            context.Items.Returns(environment);
 
-            var expectedIsSampled = fixture.Create<bool>();
-            var sampleFilter = MockRepository.GenerateStub<IZipkinConfig>();
-            sampleFilter.Expect(x => x.ShouldBeSampled(Arg<string>.Is.Null, Arg<string>.Is.Anything)).Return(expectedIsSampled);
+            var expectedIsSampled = false;
+            var sampleFilter = Substitute.For<IZipkinConfig>();
+            string sampleId = null;
+            sampleFilter.ShouldBeSampled(Arg.Is(sampleId), Arg.Any<string>()).Returns(expectedIsSampled);
 
             // Act
             var sut = new TraceProvider(sampleFilter, context);
@@ -193,11 +189,10 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void Constructor_AcceptingHeadersWithInvalidIdValues()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = fixture.Create<Guid>().ToString("N").Substring(1);
-            var spanId = fixture.Create<string>();
-            var parentSpanId = fixture.Create<string>(); 
-            var isSampled = fixture.Create<string>();
+            var traceId = Guid.NewGuid().ToString("N").Substring(1);
+            var spanId = "spanId";
+            var parentSpanId = "parent";
+            var isSampled = "sampled";
 
             var context = GenerateContext(
                 traceId,
@@ -205,9 +200,9 @@ namespace Medidata.ZipkinTracer.Core.Test
                 parentSpanId,
                 isSampled);
 
-            var expectedIsSampled = fixture.Create<bool>();
-            var sampleFilter = MockRepository.GenerateStub<IZipkinConfig>();
-            sampleFilter.Expect(x => x.ShouldBeSampled(Arg.Is(isSampled), Arg<string>.Is.Anything)).Return(expectedIsSampled);
+            var expectedIsSampled = false;
+            var sampleFilter = Substitute.For<IZipkinConfig>();
+            sampleFilter.ShouldBeSampled(Arg.Is(isSampled), Arg.Any<string>()).Returns(expectedIsSampled);
 
             // Act
             var sut = new TraceProvider(sampleFilter, context);
@@ -218,17 +213,16 @@ namespace Medidata.ZipkinTracer.Core.Test
             Assert.AreEqual(string.Empty, sut.ParentSpanId);
             Assert.AreEqual(expectedIsSampled, sut.IsSampled);
         }
-        
+
         [TestMethod]
         [ExpectedException(typeof(ArgumentException))]
         public void Constructor_AcceptingHeadersWithSpanAndParentSpan()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = Convert.ToString(fixture.Create<long>(), 16);
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
+            var traceId = Convert.ToString((long)213213, 16);
+            var spanId = Convert.ToString((long)21213231, 16);
             var parentSpanId = spanId;
-            var isSampled = fixture.Create<bool>();
+            var isSampled = false;
 
             var context = GenerateContext(
                 traceId,
@@ -244,11 +238,10 @@ namespace Medidata.ZipkinTracer.Core.Test
         public void GetNext()
         {
             // Arrange
-            var fixture = new Fixture();
-            var traceId = Convert.ToString(fixture.Create<long>(), 16);
-            var spanId = Convert.ToString(fixture.Create<long>(), 16);
-            var parentSpanId = Convert.ToString(fixture.Create<long>(), 16);
-            var isSampled = fixture.Create<bool>();
+            var traceId = Convert.ToString((long)213213, 16);
+            var spanId = Convert.ToString((long)2121, 16);
+            var parentSpanId = Convert.ToString((long)212112, 16);
+            var isSampled = false;
 
             var context = GenerateContext(
                 traceId,
@@ -267,23 +260,23 @@ namespace Medidata.ZipkinTracer.Core.Test
             Assert.AreEqual(sut.SpanId, nextTraceProvider.ParentSpanId);
             Assert.AreEqual(sut.IsSampled, nextTraceProvider.IsSampled);
         }
-        
-        private IOwinContext GenerateContext(string traceId, string spanId, string parentSpanId, string isSampled)
+
+        private HttpContext GenerateContext(string traceId, string spanId, string parentSpanId, string isSampled)
         {
-            var context = MockRepository.GenerateStub<IOwinContext>();
-            var request = MockRepository.GenerateStub<IOwinRequest>();
-            var headers = new HeaderDictionary(new Dictionary<string, string[]>
+            var context = Substitute.ForPartsOf<HttpContext>();
+            var request = Substitute.ForPartsOf<HttpRequest>();
+            var headers = new HeaderDictionary(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
             {
                 { TraceProvider.TraceIdHeaderName, new [] { traceId } },
                 { TraceProvider.SpanIdHeaderName, new [] { spanId } },
                 { TraceProvider.ParentSpanIdHeaderName, new [] { parentSpanId } },
                 { TraceProvider.SampledHeaderName, new [] { isSampled } }
             });
-            var environment = new Dictionary<string, object>();
+            var environment = new Dictionary<object, object>();
 
-            request.Stub(x => x.Headers).Return(headers);
-            context.Stub(x => x.Request).Return(request);
-            context.Stub(x => x.Environment).Return(environment);
+            request.Headers.Returns(headers);
+            context.Request.Returns(request);
+            context.Items.Returns(environment);
 
             return context;
         }

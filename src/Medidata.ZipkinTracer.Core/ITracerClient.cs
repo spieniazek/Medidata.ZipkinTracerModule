@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using Medidata.ZipkinTracer.Models;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -10,18 +11,18 @@ namespace Medidata.ZipkinTracer.Core
 
         ITraceProvider TraceProvider { get; }
 
-        Span StartServerTrace(Uri requestUri, string methodName);
+        Task<Span> StartServerTrace(Uri requestUri, string methodName);
 
-        Span StartClientTrace(Uri remoteUri, string methodName, ITraceProvider trace);
+        Task<Span> StartClientTrace(Uri remoteUri, string methodName, ITraceProvider trace);
 
         void EndServerTrace(Span serverSpan);
 
         void EndClientTrace(Span clientSpan, int statusCode);
 
-        void Record(Span span, [CallerMemberName] string value = null);
+        Task Record(Span span, [CallerMemberName] string value = null);
 
-        void RecordBinary<T>(Span span, string key, T value);
+        Task RecordBinary<T>(Span span, string key, T value);
 
-        void RecordLocalComponent(Span span, string value);
+        Task RecordLocalComponent(Span span, string value);
     }
 }

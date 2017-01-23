@@ -3,24 +3,26 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using Medidata.ZipkinTracer.Models;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core
 {
     public class ServiceEndpoint 
     {
-        public virtual Endpoint GetLocalEndpoint(string serviceName, ushort port)
+        public virtual async Task<Endpoint> GetLocalEndpoint(string serviceName, ushort port)
         {
             return new Endpoint()
             {
                 ServiceName = serviceName,
-                IPAddress = GetLocalIPAddress(),
+                IPAddress = await GetLocalIPAddress(),
                 Port = port
             };
         }
 
-        public virtual Endpoint GetRemoteEndpoint(Uri remoteServer, string remoteServiceName)
+        public virtual async Task<Endpoint> GetRemoteEndpoint(Uri remoteServer, string remoteServiceName)
         {
-            var addressBytes = GetRemoteIPAddress(remoteServer).GetAddressBytes();
+            var address = await GetRemoteIPAddress(remoteServer);
+            var addressBytes = address.GetAddressBytes();
             if (BitConverter.IsLittleEndian)
             {
                 Array.Reverse(addressBytes);
@@ -32,28 +34,28 @@ namespace Medidata.ZipkinTracer.Core
             return new Endpoint()
             {
                 ServiceName = remoteServiceName,
-                IPAddress = GetRemoteIPAddress(remoteServer),
+                IPAddress = await GetRemoteIPAddress(remoteServer),
                 Port = (ushort)remoteServer.Port
             };
         }
 
-        private static IPAddress GetLocalIPAddress()
+        private static async Task<IPAddress> GetLocalIPAddress()
         {
             if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
             {
                 return null;
             }
 
-            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+            IPHostEntry host = await Dns.GetHostEntryAsync(Dns.GetHostName());
 
             return host
                 .AddressList
                 .FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         }
 
-        private static IPAddress GetRemoteIPAddress(Uri remoteServer)
+        private static async Task<IPAddress> GetRemoteIPAddress(Uri remoteServer)
         {
-            var adressList = Dns.GetHostAddresses(remoteServer.Host);
+            var adressList = await Dns.GetHostAddressesAsync(remoteServer.Host);
             return adressList.FirstOrDefault(ip => ip.AddressFamily == AddressFamily.InterNetwork);
         }
     }

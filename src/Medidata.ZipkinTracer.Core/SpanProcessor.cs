@@ -4,9 +4,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using Medidata.ZipkinTracer.Core.Logging;
 using Medidata.ZipkinTracer.Models;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -21,16 +23,16 @@ namespace Medidata.ZipkinTracer.Core
 
         //using a queue because even as we pop items to send to zipkin, another 
         //thread can be adding spans if someone shares the span processor accross threads
-        internal ConcurrentQueue<JsonSpan> serializableSpans; 
+        internal ConcurrentQueue<JsonSpan> serializableSpans;
         internal SpanProcessorTaskFactory spanProcessorTaskFactory;
 
         internal int subsequentPollCount;
         internal uint maxBatchSize;
-        private readonly ILog logger;
+        private readonly ILogger<SpanProcessor> logger;
 
         public SpanProcessor(Uri uri, BlockingCollection<Span> spanQueue, uint maxBatchSize)
         {
-            if ( spanQueue == null) 
+            if (spanQueue == null)
             {
                 throw new ArgumentNullException("spanQueue");
             }
@@ -44,22 +46,22 @@ namespace Medidata.ZipkinTracer.Core
             this.spanQueue = spanQueue;
             this.serializableSpans = new ConcurrentQueue<JsonSpan>();
             this.maxBatchSize = maxBatchSize;
-            this.logger = LogProvider.GetCurrentClassLogger();
+            this.logger = new LoggerFactory().CreateLogger<SpanProcessor>();
             spanProcessorTaskFactory = new SpanProcessorTaskFactory();
         }
 
-        public virtual void Stop()
+        public virtual async Task Stop()
         {
             spanProcessorTaskFactory.StopTask();
-            LogSubmittedSpans();
+            await LogSubmittedSpans();
         }
 
         public virtual void Start()
         {
-            spanProcessorTaskFactory.CreateAndStart(LogSubmittedSpans);
+            spanProcessorTaskFactory.CreateAndStart(() => LogSubmittedSpans());
         }
 
-        internal virtual void LogSubmittedSpans()
+        internal virtual async Task LogSubmittedSpans()
         {
             var anyNewSpans = ProcessQueuedSpans();
 
@@ -68,25 +70,29 @@ namespace Medidata.ZipkinTracer.Core
 
             if (ShouldSendQueuedSpansOverWire())
             {
-                SendSpansOverHttp();
+                await SendSpansOverHttp();
             }
         }
 
-        public virtual void SendSpansToZipkin(string spans)
+        public virtual async Task SendSpansToZipkin(string spans)
         {
-            if(spans == null) throw new ArgumentNullException("spans");
-            using (var client = new WebClient())
+            if (spans == null) throw new ArgumentNullException("spans");
+            using (var client = new HttpClient())
             {
                 try
                 {
-                    client.BaseAddress = uri.ToString();
-                    client.UploadString(ZIPKIN_SPAN_POST_PATH, "POST", spans);
+                    client.BaseAddress = uri;
+                    var response = await client.PostAsync(ZIPKIN_SPAN_POST_PATH, new StringContent(spans));
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        logger.LogError("Failed to send spans to Zipkin server (HTTP status code returned: {0}). Response from server: {1}",
+                            response.StatusCode, await response.Content.ReadAsStringAsync());
+                    }
                 }
-                catch (WebException ex)
+                catch (Exception ex)
                 {
-                    //Very friendly HttpWebRequest Error message with good information.
-                    LogHttpErrorMessage(ex);
-                    throw;
+                    logger.LogError(new EventId(0), ex, ex.Message);
                 }
             }
         }
@@ -111,10 +117,10 @@ namespace Medidata.ZipkinTracer.Core
             return anyNewSpansQueued;
         }
 
-        private void SendSpansOverHttp()
+        private async Task SendSpansOverHttp()
         {
             var spansJsonRepresentation = GetSpansJSONRepresentation();
-            SendSpansToZipkin(spansJsonRepresentation);
+            await SendSpansToZipkin(spansJsonRepresentation);
             subsequentPollCount = 0;
         }
 
@@ -129,17 +135,6 @@ namespace Medidata.ZipkinTracer.Core
             }
             var spansJsonRepresentation = JsonConvert.SerializeObject(spanList);
             return spansJsonRepresentation;
-        }
-
-        private void LogHttpErrorMessage(WebException ex)
-        {
-            var response = ex.Response as HttpWebResponse;
-            if ((response == null)) return;
-            var responseStream = response.GetResponseStream();
-            var responseString = responseStream != null ? new StreamReader(responseStream).ReadToEnd() : string.Empty;
-            logger.ErrorFormat(
-                "Failed to send spans to Zipkin server (HTTP status code returned: {0}). Exception message: {1}, response from server: {2}",
-                response.StatusCode, ex.Message, responseString);
         }
     }
 }

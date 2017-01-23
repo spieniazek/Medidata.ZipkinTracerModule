@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0-*",
+
+  "dependencies": {
+    "Microsoft.AspNetCore.Http.Extensions": "1.1.0",
+    "Microsoft.AspNetCore.Owin": "1.1.0",
+    "Microsoft.Extensions.Logging": "1.1.0",
+    "Microsoft.Extensions.Logging.Abstractions": "1.1.0",
+    "NETStandard.Library": "1.6.1",
+    "Newtonsoft.Json": "9.0.2-beta1",
+    "System.Diagnostics.Tools": "4.3.0",
+    "System.Net.NameResolution": "4.3.0",
+    "System.Net.NetworkInformation": "4.3.0"
+  },
+
+  "frameworks": {
+    "netstandard1.3": {
+      "imports": "dnxcore50"
+    }
+  }
+}

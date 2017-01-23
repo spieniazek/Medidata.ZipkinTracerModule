@@ -1,39 +1,44 @@
 ﻿using System.Threading.Tasks;
-using Microsoft.Owin;
-using Owin;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Extensions;
+using System;
+using Microsoft.AspNetCore.Builder;
 
 namespace Medidata.ZipkinTracer.Core.Middlewares
 {
-    public class ZipkinMiddleware : OwinMiddleware
+    public class ZipkinMiddleware
     {
         private readonly IZipkinConfig _config;
 
-        public ZipkinMiddleware(OwinMiddleware next, IZipkinConfig options) : base(next)
+        private readonly RequestDelegate _next;
+
+        public ZipkinMiddleware(RequestDelegate next, IZipkinConfig options)
         {
             _config = options;
+            _next = next;
         }
 
-        public override async Task Invoke(IOwinContext context)
+        public async Task Invoke(HttpContext context)
         {
             if (_config.Bypass != null && _config.Bypass(context.Request))
             {
-                await Next.Invoke(context);
+                await _next(context);
                 return;
             }
 
             var zipkin = new ZipkinClient(_config, context);
-            var span = zipkin.StartServerTrace(context.Request.Uri, context.Request.Method);
-            await Next.Invoke(context);
+            var span = await zipkin.StartServerTrace(new Uri(context.Request.GetEncodedUrl()), context.Request.Method);
+            await _next(context);
             zipkin.EndServerTrace(span);
         }
     }
 
     public static class AppBuilderExtensions
     {
-        public static void UseZipkin(this IAppBuilder app, IZipkinConfig config)
+        public static void UseZipkin(this IApplicationBuilder app, IZipkinConfig config)
         {
             config.Validate();
-            app.Use<ZipkinMiddleware>(config);
+            app.UseMiddleware<ZipkinMiddleware>(config);
         }
     }
 }

@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using Medidata.ZipkinTracer.Core.Logging;
-using Microsoft.Owin;
 using Medidata.ZipkinTracer.Models;
 using Medidata.ZipkinTracer.Core.Helpers;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -12,7 +13,7 @@ namespace Medidata.ZipkinTracer.Core
         internal SpanCollector spanCollector;
         internal SpanTracer spanTracer;
 
-        private ILog logger;
+        private ILogger<ZipkinClient> logger;
 
         public bool IsTraceOn { get; set; }
 
@@ -34,7 +35,7 @@ namespace Medidata.ZipkinTracer.Core
             return instance;
         }
 
-        public ZipkinClient(IZipkinConfig zipkinConfig, IOwinContext context, SpanCollector collector = null)
+        public ZipkinClient(IZipkinConfig zipkinConfig, HttpContext context, SpanCollector collector = null)
         {
             if (zipkinConfig == null) throw new ArgumentNullException(nameof(zipkinConfig));
             if (context == null) throw new ArgumentNullException(nameof(context));
@@ -46,7 +47,7 @@ namespace Medidata.ZipkinTracer.Core
 
             zipkinConfig.Validate();
             ZipkinConfig = zipkinConfig;
-            this.logger = LogProvider.GetCurrentClassLogger();
+            logger = new LoggerFactory().CreateLogger<ZipkinClient>();
 
             try
             {
@@ -66,19 +67,19 @@ namespace Medidata.ZipkinTracer.Core
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error Building Zipkin Client Provider", ex);
+                logger.LogError(new EventId(0), ex, "Error Building Zipkin Client Provider");
                 IsTraceOn = false;
             }
         }
 
-        public Span StartClientTrace(Uri remoteUri, string methodName, ITraceProvider trace)
+        public async Task<Span> StartClientTrace(Uri remoteUri, string methodName, ITraceProvider trace)
         {
             if (!IsTraceOn)
                 return null;
 
             try
             {
-                return spanTracer.SendClientSpan(
+                return await spanTracer.SendClientSpan(
                     methodName.ToLower(),
                     trace.TraceId,
                     trace.ParentSpanId,
@@ -87,7 +88,7 @@ namespace Medidata.ZipkinTracer.Core
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error Starting Client Trace", ex);
+                logger.LogError(new EventId(0), ex, "Error Starting Client Trace");
                 return null;
             }
         }
@@ -103,18 +104,18 @@ namespace Medidata.ZipkinTracer.Core
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error Ending Client Trace", ex);
+                logger.LogError(new EventId(0), ex, "Error Ending Client Trace");
             }
         }
 
-        public Span StartServerTrace(Uri requestUri, string methodName)
+        public async Task<Span> StartServerTrace(Uri requestUri, string methodName)
         {
             if (!IsTraceOn)
                 return null;
 
             try
             {
-                return spanTracer.ReceiveServerSpan(
+                return await spanTracer.ReceiveServerSpan(
                     methodName.ToLower(),
                     TraceProvider.TraceId,
                     TraceProvider.ParentSpanId,
@@ -123,7 +124,7 @@ namespace Medidata.ZipkinTracer.Core
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error Starting Server Trace", ex);
+                logger.LogError(new EventId(0), ex, "Error Starting Server Trace");
                 return null;
             }
         }
@@ -139,7 +140,7 @@ namespace Medidata.ZipkinTracer.Core
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error Ending Server Trace", ex);
+                logger.LogError(new EventId(0), ex, "Error Ending Server Trace");
             }
         }
 
@@ -149,18 +150,18 @@ namespace Medidata.ZipkinTracer.Core
         /// <param name="span">The span where the annotation will be recorded.</param>
         /// <param name="value">The value of the annotation to be recorded. If this parameter is omitted
         /// (or its value set to null), the method caller member name will be automatically passed.</param>
-        public void Record(Span span, [CallerMemberName] string value = null)
+        public async Task Record(Span span, [CallerMemberName] string value = null)
         {
             if (!IsTraceOn)
                 return;
 
             try
             {
-                spanTracer.Record(span, value);
+                await spanTracer.Record(span, value);
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => "Error recording the annotation", ex);
+                logger.LogError(new EventId(0), ex, "Error recording the annotation");
             }
         }
 
@@ -178,18 +179,18 @@ namespace Medidata.ZipkinTracer.Core
         /// 
         /// Please note, that although the values have types, they will be recorded and sent by calling their
         /// respective ToString() method.</remarks>
-        public void RecordBinary<T>(Span span, string key, T value)
+        public async Task RecordBinary<T>(Span span, string key, T value)
         {
             if (!IsTraceOn)
                 return;
 
             try
             {
-                spanTracer.RecordBinary<T>(span, key, value);
+                await spanTracer.RecordBinary(span, key, value);
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => $"Error recording a binary annotation (key: {key})", ex);
+                logger.LogError(new EventId(0), ex, $"Error recording a binary annotation (key: {key})");
             }
         }
 
@@ -198,18 +199,18 @@ namespace Medidata.ZipkinTracer.Core
         /// </summary>
         /// <param name="span">The span where the annotation will be recorded.</param>
         /// <param name="value">The value of the local trace to be recorder.</param>
-        public void RecordLocalComponent(Span span, string value)
+        public async Task RecordLocalComponent(Span span, string value)
         {
             if (!IsTraceOn)
                 return;
 
             try
             {
-                spanTracer.RecordBinary(span, ZipkinConstants.LocalComponent, value);
+                await spanTracer.RecordBinary(span, ZipkinConstants.LocalComponent, value);
             }
             catch (Exception ex)
             {
-                logger.Log(LogLevel.Error, () => $"Error recording local trace (value: {value})", ex);
+                logger.LogError(new EventId(0), ex, $"Error recording local trace (value: {value})");
             }
         }
 

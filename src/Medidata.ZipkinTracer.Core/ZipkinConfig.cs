@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Owin;
+using Microsoft.AspNetCore.Http;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -9,9 +9,9 @@ namespace Medidata.ZipkinTracer.Core
     {
         private Random random = new Random();
 
-        public Predicate<IOwinRequest> Bypass { get; set; } = r => false;
+        public Predicate<HttpRequest> Bypass { get; set; } = r => false;
         public Uri ZipkinBaseUri { get; set; }
-        public Func<IOwinRequest, Uri> Domain { get; set; }
+        public Func<HttpRequest, Uri> Domain { get; set; }
         public uint SpanProcessorBatchSize { get; set; }
         public IList<string> ExcludedPathList { get; set; } = new List<string>();
         public double SampleRate { get; set; }
@@ -27,7 +27,7 @@ namespace Medidata.ZipkinTracer.Core
 
             if (Domain == null)
             {
-                Domain = request => new Uri(request.Uri.Host);
+                Domain = request => new Uri(request.Host.Host);
             }
 
             if (ExcludedPathList == null)
@@ -71,7 +71,7 @@ namespace Medidata.ZipkinTracer.Core
         {
             if (path != null)
             {
-                if (ExcludedPathList.Any(uri => path.StartsWith(uri, StringComparison.InvariantCultureIgnoreCase)))
+                if (ExcludedPathList.Any(uri => path.StartsWith(uri, StringComparison.CurrentCultureIgnoreCase)))
                 {
                     return true;
                 }

@@ -1,7 +1,7 @@
 src/*/bin/*
 src/*/obj/*
-tests/*/bin/*
-tests/*/obj/*
+test/*/bin/*
+test/*/obj/*
 src/*/lib/*
 *.user
 *.suo
@@ -9,4 +9,4 @@ src/*/lib/*
 
 TestResults/
 packages/
-.vs/*/*
+.vs/

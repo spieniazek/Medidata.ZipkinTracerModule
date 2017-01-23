@@ -37,7 +37,7 @@ namespace Medidata.ZipkinTracer.Core
 
         public virtual void Stop()
         {
-            SyncHelper.ExecuteSafely(syncObj, () => IsStarted, () => { spanProcessor.Stop() ; IsStarted = false; });
+            SyncHelper.ExecuteSafely(syncObj, () => IsStarted, async () => { await spanProcessor.Stop(); IsStarted = false; });
         }
     }
 }

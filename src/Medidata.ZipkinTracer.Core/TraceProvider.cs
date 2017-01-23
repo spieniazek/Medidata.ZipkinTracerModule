@@ -1,6 +1,6 @@
 ﻿using System;
-using Microsoft.Owin;
 using Medidata.ZipkinTracer.Core.Helpers;
+using Microsoft.AspNetCore.Http;
 
 namespace Medidata.ZipkinTracer.Core
 {
@@ -15,7 +15,7 @@ namespace Medidata.ZipkinTracer.Core
         public const string SampledHeaderName = "X-B3-Sampled";
 
         /// <summary>
-        /// Key name for context.Environment
+        /// Key name for context.Items
         /// </summary>
         public const string Key = "Medidata.ZipkinTracer.Core.TraceProvider";
 
@@ -39,13 +39,12 @@ namespace Medidata.ZipkinTracer.Core
         /// </summary>
         public bool IsSampled { get; }
 
-        // TODO: Make another constructor to accept System.Web.HttpContext for non Owin applications
         /// <summary>
         /// Initializes a new instance of the TraceProvider class.
         /// </summary>
         /// <param name="config">ZipkinConfig instance</param>
-        /// <param name="context">the IOwinContext</param>
-        internal TraceProvider(IZipkinConfig config, IOwinContext context = null)
+        /// <param name="context">the HttpContext</param>
+        internal TraceProvider(IZipkinConfig config, HttpContext context = null)
         {
             string headerTraceId = null;
             string headerSpanId = null;
@@ -56,7 +55,7 @@ namespace Medidata.ZipkinTracer.Core
             if (context != null)
             {
                 object value;
-                if (context.Environment.TryGetValue(Key, out value))
+                if (context.Items.TryGetValue(Key, out value))
                 {
                     // set properties from context's item.
                     var provider = (ITraceProvider)value;
@@ -86,7 +85,7 @@ namespace Medidata.ZipkinTracer.Core
                 throw new ArgumentException("x-b3-SpanId and x-b3-ParentSpanId must not be the same value.");
             }
 
-            context?.Environment.Add(Key, this);
+            context?.Items.Add(Key, this);
         }
 
         /// <summary>

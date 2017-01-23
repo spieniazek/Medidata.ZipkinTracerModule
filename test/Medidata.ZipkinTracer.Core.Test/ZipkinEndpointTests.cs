@@ -1,28 +1,21 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Ploeh.AutoFixture;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core.Test
 {
     [TestClass]
     public class ZipkinEndpointTests
     {
-        private IFixture fixture;
-
-        [TestInitialize]
-        public void Init()
-        {
-            fixture = new Fixture();
-        }
 
         [TestMethod]
-        public void GetLocalEndpoint()
+        public async Task GetLocalEndpoint()
         {
-            var serviceName = fixture.Create<string>();
-            var port = fixture.Create<ushort>();
+            var serviceName = "name";
+            ushort port = 12312;
 
             var zipkinEndpoint = new ServiceEndpoint();
-            var endpoint = zipkinEndpoint.GetLocalEndpoint(serviceName, port);
+            var endpoint = await zipkinEndpoint.GetLocalEndpoint(serviceName, port);
 
             Assert.IsNotNull(endpoint);
             Assert.AreEqual(serviceName, endpoint.ServiceName);
@@ -31,13 +24,13 @@ namespace Medidata.ZipkinTracer.Core.Test
         }
 
         [TestMethod]
-        public void GetRemoteEndpoint()
+        public async Task GetRemoteEndpoint()
         {
             var remoteUri = new Uri("http://localhost");
-            var serviceName = fixture.Create<string>();
+            var serviceName = "name";
 
             var zipkinEndpoint = new ServiceEndpoint();
-            var endpoint = zipkinEndpoint.GetRemoteEndpoint(remoteUri, serviceName);
+            var endpoint = await zipkinEndpoint.GetRemoteEndpoint(remoteUri, serviceName);
 
             Assert.IsNotNull(endpoint);
             Assert.AreEqual(serviceName, endpoint.ServiceName);

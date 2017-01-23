@@ -1,7 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using Medidata.ZipkinTracer.Models;
+using Medidata.ZipkinTracer.Core.Helpers;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Ploeh.AutoFixture;
+using System.Collections.Generic;
 
 namespace Medidata.ZipkinTracer.Core.Test
 {
@@ -13,12 +18,11 @@ namespace Medidata.ZipkinTracer.Core.Test
         [TestInitialize]
         public void Init()
         {
-            var fixture = new Fixture();
             _sut = new ZipkinConfig
             {
                 ZipkinBaseUri = new Uri("http://zipkin.com"),
                 Domain = r => new Uri("http://server.com"),
-                SpanProcessorBatchSize = fixture.Create<uint>(),
+                SpanProcessorBatchSize = 123,
                 ExcludedPathList = new List<string>(),
                 SampleRate = 0,
                 NotToBeDisplayedDomainList = new List<string>()
@@ -86,7 +90,7 @@ namespace Medidata.ZipkinTracer.Core.Test
                 string sampledFlag,
                 string requestPath,
                 double sampleRate,
-                List<string> excludedPathList,                
+                List<string> excludedPathList,
                 bool expectedOutcome)
             {
                 SampledFlag = sampledFlag;
@@ -121,16 +125,15 @@ namespace Medidata.ZipkinTracer.Core.Test
                 // sampledFlag has an invalid bool string value, requestPath not in IsInDontSampleList, and sample rate is 1
                 { new ShouldBeSampledCondition(null, null, 1, new List<string>(), true) },
             };
-            
+
             foreach (var testScenario in testScenarios)
             {
-                var fixture = new Fixture();
                 _sut = new ZipkinConfig
                 {
                     ExcludedPathList = testScenario.ExcludedPathList,
                     SampleRate = testScenario.SampleRate
                 };
-
+                
                 // Act
                 var result = _sut.ShouldBeSampled(testScenario.SampledFlag, testScenario.RequestPath);
 

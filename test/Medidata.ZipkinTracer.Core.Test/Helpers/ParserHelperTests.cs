@@ -40,7 +40,7 @@ namespace Medidata.ZipkinTracer.Core.Test.Helpers
         {
             // Arrange
             var longStringRepresentation = long.MaxValue.ToString("x");
-            string value = longStringRepresentation.Substring(1) + "k" ;
+            string value = longStringRepresentation.Substring(1) + "k";
 
             // Act
             var result = ParserHelper.IsParsableTo128Or64Bit(value);

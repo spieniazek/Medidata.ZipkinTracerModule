@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0-*",
+  "testRunner": "mstest",
+
+  "buildOptions": {
+    "emitEntryPoint": true
+  },
+
+  "dependencies": {
+    "dotnet-test-mstest": "1.1.2-preview",
+    "Medidata.ZipkinTracer.Core": "1.0.0-*",
+    "Microsoft.NETCore.App": {
+      "type": "platform",
+      "version": "1.0.1"
+    },
+    "MSTest.TestFramework": "1.0.8-rc2",
+    "NSubstitute": "2.0.1-rc",
+    "System.Diagnostics.StackTrace": "4.3.0"
+  },
+
+  "frameworks": {
+    "netcoreapp1.0": {
+      "imports": "dnxcore50"
+    }
+  }
+}

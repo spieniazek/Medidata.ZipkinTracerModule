@@ -1,26 +1,24 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using Medidata.ZipkinTracer.Core.Logging;
 using Medidata.ZipkinTracer.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Ploeh.AutoFixture;
-using Rhino.Mocks;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using System.Threading.Tasks;
 
 namespace Medidata.ZipkinTracer.Core.Test
 {
     [TestClass]
     public class SpanCollectorTests
     {
-        IFixture fixture;
         private SpanCollector spanCollector;
         private SpanProcessor spanProcessorStub;
-        private ILog logger;
+        private ILogger<SpanCollector> logger;
 
         [TestInitialize]
         public void Init()
         {
-            fixture = new Fixture();
-            logger = MockRepository.GenerateStub<ILog>();
+            logger = Substitute.For<ILogger<SpanCollector>>();
         }
 
         [TestMethod]
@@ -41,7 +39,7 @@ namespace Medidata.ZipkinTracer.Core.Test
 
             spanCollector = new SpanCollector(new Uri("http://localhost"), 0);
 
-            Assert.IsTrue(System.Object.ReferenceEquals(SpanCollector.spanQueue, spanQueue));
+            Assert.IsTrue(ReferenceEquals(SpanCollector.spanQueue, spanQueue));
         }
 
         [TestMethod]
@@ -49,11 +47,11 @@ namespace Medidata.ZipkinTracer.Core.Test
         {
             SetupSpanCollector();
 
-            var testSpanId = fixture.Create<string>(); 
-            var testTraceId = fixture.Create<string>(); 
-            var testParentSpanId = fixture.Create<string>(); 
-            var testName = fixture.Create<string>();
-            
+            var testSpanId = "spanId";
+            var testTraceId = "traceId";
+            var testParentSpanId = "parentSpanId";
+            var testName = "name";
+
             Span span = new Span();
             span.Id = testSpanId;
             span.TraceId = testTraceId;
@@ -77,30 +75,30 @@ namespace Medidata.ZipkinTracer.Core.Test
 
             spanCollector.Start();
 
-            spanProcessorStub.AssertWasCalled(x => x.Start());
+            spanProcessorStub.Received().Start();
             Assert.IsTrue(spanCollector.IsStarted);
         }
 
         [TestMethod]
-        public void StopProcessingSpansWithoutStartFirst()
+        public async Task StopProcessingSpansWithoutStartFirst()
         {
             SetupSpanCollector();
 
             spanCollector.Stop();
 
-            spanProcessorStub.AssertWasNotCalled(x => x.Stop());
+            await spanProcessorStub.DidNotReceive().Stop();
             Assert.IsFalse(spanCollector.IsStarted);
         }
 
         [TestMethod]
-        public void StopProcessingSpans()
+        public async Task StopProcessingSpans()
         {
             SetupSpanCollector();
 
             spanCollector.Start();
             spanCollector.Stop();
 
-            spanProcessorStub.AssertWasCalled(x => x.Stop());
+            await spanProcessorStub.Received().Stop();
             Assert.IsFalse(spanCollector.IsStarted);
         }
 
@@ -108,9 +106,11 @@ namespace Medidata.ZipkinTracer.Core.Test
         {
             spanCollector = new SpanCollector(new Uri("http://localhost"), 0);
 
-            SpanCollector.spanQueue = fixture.Create<BlockingCollection<Span>>();
-            spanProcessorStub = MockRepository.GenerateStub<SpanProcessor>(new Uri("http://localhost"),
-                    SpanCollector.spanQueue, (uint)0);
+            SpanCollector.spanQueue = Substitute.For<BlockingCollection<Span>>();
+            spanProcessorStub = Substitute.For<SpanProcessor>(
+                new Uri("http://localhost"),
+                SpanCollector.spanQueue,
+                (uint)0);
             spanCollector.spanProcessor = spanProcessorStub;
         }
     }

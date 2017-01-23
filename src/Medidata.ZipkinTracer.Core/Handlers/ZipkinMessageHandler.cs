@@ -34,7 +34,7 @@ namespace Medidata.ZipkinTracer.Core.Handlers
             request.Headers.Add(TraceProvider.ParentSpanIdHeaderName, nextTrace.ParentSpanId);
             request.Headers.Add(TraceProvider.SampledHeaderName, nextTrace.ParentSpanId);
 
-            var span = _client.StartClientTrace(request.RequestUri, request.Method.ToString(), nextTrace);
+            var span = await _client.StartClientTrace(request.RequestUri, request.Method.ToString(), nextTrace);
             var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             _client.EndClientTrace(span, (int)response.StatusCode);
